@@ -1,6 +1,5 @@
 import os
 import tempfile
-import time
 import uuid
 from io import BytesIO
 
@@ -130,7 +129,7 @@ def detect_objects_in_video(video_path, model, db, video_id, name, n=3):
                         height / 3 <= center_y <= 2 * height / 3):
 
                     type = classify_image(frame)
-                    time = frame*fps
+                    time = float(frame_count*fps)
                     save_screenshot(frame, db, video_id, name, time, type)
 
         frame_count += 1
