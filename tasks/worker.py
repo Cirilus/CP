@@ -125,8 +125,8 @@ def detect_objects_in_video(video_path, model, db, video_id, name, n=3):
 
                 x1, y1, x2, y2 = int(boxes_xyxy[0]), int(boxes_xyxy[1]), int(boxes_xyxy[2]), int(boxes_xyxy[3])
                 center_x, center_y = (x1 + x2) / 2, (y1 + y2) / 2
-                if (width / 3 <= center_x <= 2 * width / 3 and
-                        height / 3 <= center_y <= 2 * height / 3):
+                if (2 * width / 5 <= center_x <= 1 * width / 2 and
+                        2 * height / 5 <= center_y <= 1 * height / 2):
 
                     type = classify_image(frame)
                     time = float(frame_count*fps)
@@ -145,7 +145,7 @@ def mp4_to_hls_minio(stream: bytes, name: str, video_id: uuid.UUID):
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_mp4 = os.path.join(temp_dir, f"{name}")
 
-        temp_cropped_mp4 = os.path.join(temp_dir, f"{name}_crop.mp4v")
+        temp_cropped_mp4 = os.path.join(temp_dir, f"{name}_crop")
 
         start_time = (1 * 60) + 50
         end_time = (2 * 60) + 10
@@ -162,14 +162,12 @@ def mp4_to_hls_minio(stream: bytes, name: str, video_id: uuid.UUID):
         logger.debug(f"cropped video, path={temp_cropped_mp4}")
         crop_video(temp_mp4, temp_cropped_mp4, start_time, end_time)
 
-        time.sleep(10)
-
         logger.debug("predicting")
         detect_objects_in_video(temp_mp4, model, db, video_id, name, 3)
 
         video = db.query(Video).filter_by(id=video_id).first()
 
-        video.status="completed"
+        video.status = "completed"
         db.commit()
 
         db.close()

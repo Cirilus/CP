@@ -1,15 +1,13 @@
-import io
 import uuid
-
 import ffmpeg
-from fastapi import APIRouter, UploadFile, File, Depends, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Depends
 from fastapi.responses import StreamingResponse
 import cv2
 from typing import List
-
+from collections import Counter
 from models.Video import Video
 from services.Video import VideoService
-from schemas.Schemas import VideoSchema
+from schemas.Schemas import VideoSchema, VideoSchemaList
 from utils.wrappers import error_wrapper
 from ml.model import model
 
@@ -37,12 +35,39 @@ async def load(video: UploadFile = File(...), video_service: VideoService = Depe
 @router.get(
     "/list",
     summary="returning the list of the videos",
-    response_model=List[VideoSchema],
+    response_model=List[VideoSchemaList],
 )
 async def list(minio_service: VideoService = Depends()):
     results = error_wrapper(minio_service.get_list)
 
-    return results
+    answers = []
+    for result in results:
+        types_counter = Counter()
+        for screenshot in result.screenshots:
+            types_counter[screenshot.type] += 1
+
+        if len(types_counter.most_common(1)) > 0:
+            answer = VideoSchema(
+                id=result.id,
+                name=result.name,
+                path=result.path,
+                status=result.status,
+                created=result.created,
+                screenshots=result.screenshots,
+                popular=types_counter.most_common(1)[0][0]
+            )
+            answers.append(answer)
+            continue
+        answers.append(VideoSchema(
+            id=result.id,
+            name=result.name,
+            path=result.path,
+            status=result.status,
+            created=result.created,
+            screenshots=result.screenshots,
+        ))
+
+    return answers
 
 
 @router.get(
