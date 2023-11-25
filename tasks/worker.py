@@ -2,7 +2,7 @@ import os
 import tempfile
 import uuid
 from io import BytesIO
-
+import time
 import boto3
 import cv2
 from PIL import Image
