@@ -47,7 +47,7 @@ async def list(minio_service: VideoService = Depends()):
             types_counter[screenshot.type] += 1
 
         if len(types_counter.most_common(1)) > 0:
-            answer = VideoSchema(
+            answer = VideoSchemaList(
                 id=result.id,
                 name=result.name,
                 path=result.path,
@@ -58,7 +58,7 @@ async def list(minio_service: VideoService = Depends()):
             )
             answers.append(answer)
             continue
-        answers.append(VideoSchema(
+        answers.append(VideoSchemaList(
             id=result.id,
             name=result.name,
             path=result.path,
