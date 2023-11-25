@@ -1,0 +1,105 @@
+version: "3"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      worker:
+        condition: service_started
+    command: >
+      bash -c "poetry run alembic upgrade head && poetry run uvicorn app:app --host 0.0.0.0 --port 8000"
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: "poetry run celery -A tasks.worker:celery worker -l info --pool gevent"
+
+  worker2:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - redis
+    command: "poetry run celery -A tasks.worker:celery worker -l info --pool gevent"
+
+  redis:
+    image: redis:7.0.5-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:latest
+    container_name: db
+    restart: unless-stopped
+    volumes:
+      - postgres_storage:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    volumes:
+      - static_storage:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: user
+      MINIO_ROOT_PASSWORD: password
+    command: server /data --console-address :9001
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  createbucket:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add --api s3v4 s3 http://minio:9000 user password;
+      /usr/bin/mc mb s3/static/;
+      /usr/bin/mc anonymous set download s3/static;
+      "
+
+  nginx:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./.docker/nginx/
+    container_name: nginx
+    restart: unless-stopped
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "9002:9002"
+      - "9003:9003"
+
+volumes:
+  postgres_storage:
+  static_storage:
